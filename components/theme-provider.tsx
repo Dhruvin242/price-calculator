@@ -47,7 +47,8 @@ function ThemeHotkey() {
         return
       }
 
-      if (event.key.toLowerCase() !== "d") {
+      // Some events (autofill, IME, password managers) fire without `key`.
+      if (event.key?.toLowerCase() !== "d") {
         return
       }
 
