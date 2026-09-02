@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { getPublicOrigin } from "@/lib/origin"
 import { createClient } from "@/lib/server"
 
 /**
@@ -7,7 +8,8 @@ import { createClient } from "@/lib/server"
  * Exchanges the `code` for a session cookie, then forwards the user on.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const origin = getPublicOrigin(request)
   const code = searchParams.get("code")
   const next = searchParams.get("next") ?? "/dashboard"
 
