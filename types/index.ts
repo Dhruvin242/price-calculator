@@ -76,6 +76,37 @@ export interface StallListItem extends StallRow {
 }
 
 // ---------------------------------------------------------------------------
+// Materials library
+// ---------------------------------------------------------------------------
+export interface MaterialRow {
+  id: string
+  user_id: string
+  name: string
+  unit: string
+  package_cost: number
+  units_per_package: number
+  supplier: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Units a material can be measured in. Free-form on the DB side. */
+export const MATERIAL_UNITS = [
+  "piece",
+  "gram",
+  "kg",
+  "ml",
+  "litre",
+  "metre",
+  "sheet",
+  "pack",
+  "set",
+] as const
+
+export type MaterialUnit = (typeof MATERIAL_UNITS)[number]
+
+// ---------------------------------------------------------------------------
 // Customers & invoices
 // ---------------------------------------------------------------------------
 export interface CustomerRow {

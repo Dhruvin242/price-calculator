@@ -9,8 +9,14 @@ function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
-function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+// See the note in dialog.tsx: a `render` element brings its own `data-slot`.
+function PopoverTrigger({ render, ...props }: PopoverPrimitive.Trigger.Props) {
+  return (
+    <PopoverPrimitive.Trigger
+      {...(render ? { render } : { "data-slot": "popover-trigger" })}
+      {...props}
+    />
+  )
 }
 
 function PopoverContent({

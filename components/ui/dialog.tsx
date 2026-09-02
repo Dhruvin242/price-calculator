@@ -11,8 +11,17 @@ function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
-function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+// Base UI merges a trigger's props onto the element passed to `render`, but the
+// server and the client resolve conflicting `data-slot` values in a different
+// order — which React reports as a hydration mismatch. When a `render` element
+// is supplied it carries its own `data-slot`, so we drop ours.
+function DialogTrigger({ render, ...props }: DialogPrimitive.Trigger.Props) {
+  return (
+    <DialogPrimitive.Trigger
+      {...(render ? { render } : { "data-slot": "dialog-trigger" })}
+      {...props}
+    />
+  )
 }
 
 function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {

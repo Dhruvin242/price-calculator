@@ -2,7 +2,7 @@ import Link from "next/link"
 import type { Metadata } from "next"
 import { ArrowLeft } from "lucide-react"
 
-import { getProduct, getProfile } from "@/lib/queries"
+import { getMaterials, getProduct, getProfile } from "@/lib/queries"
 import { PricingCalculator } from "@/components/calculator/pricing-calculator"
 
 export const metadata: Metadata = { title: "Calculator" }
@@ -13,9 +13,10 @@ export default async function CalculatorPage({
   searchParams: Promise<{ id?: string }>
 }) {
   const { id } = await searchParams
-  const [product, profile] = await Promise.all([
+  const [product, profile, library] = await Promise.all([
     id ? getProduct(id) : Promise.resolve(null),
     getProfile(),
+    getMaterials(),
   ])
   const currency = profile?.currency ?? "INR"
 
@@ -38,7 +39,7 @@ export default async function CalculatorPage({
         </div>
       </div>
 
-      <PricingCalculator product={product} currency={currency} />
+      <PricingCalculator product={product} currency={currency} library={library} />
     </div>
   )
 }

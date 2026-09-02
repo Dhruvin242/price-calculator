@@ -11,8 +11,14 @@ function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
 
-function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
+// See the note in dialog.tsx: a `render` element brings its own `data-slot`.
+function SheetTrigger({ render, ...props }: SheetPrimitive.Trigger.Props) {
+  return (
+    <SheetPrimitive.Trigger
+      {...(render ? { render } : { "data-slot": "sheet-trigger" })}
+      {...props}
+    />
+  )
 }
 
 function SheetClose({ ...props }: SheetPrimitive.Close.Props) {

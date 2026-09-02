@@ -240,6 +240,85 @@ export async function deleteSale(id: string, stallId: string): Promise<ActionRes
 }
 
 // ---------------------------------------------------------------------------
+// Materials library
+// ---------------------------------------------------------------------------
+export interface MaterialPayload {
+  id?: string
+  name: string
+  unit: string
+  package_cost: number
+  units_per_package: number
+  supplier: string | null
+  notes: string | null
+}
+
+export async function saveMaterial(payload: MaterialPayload): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: "You must be logged in." }
+
+  const name = payload.name.trim()
+  if (!name) return { ok: false, error: "Material name is required." }
+  if (!(payload.units_per_package > 0)) {
+    return { ok: false, error: "Units per pack must be greater than zero." }
+  }
+
+  const record = {
+    user_id: user.id,
+    name,
+    unit: payload.unit,
+    package_cost: round(payload.package_cost),
+    units_per_package: round(payload.units_per_package, 3),
+    supplier: payload.supplier?.trim() || null,
+    notes: payload.notes?.trim() || null,
+  }
+
+  if (payload.id) {
+    const { error } = await supabase
+      .from("materials")
+      .update(record)
+      .eq("id", payload.id)
+      .eq("user_id", user.id)
+    if (error) return { ok: false, error: error.message }
+    revalidatePath("/dashboard/materials")
+    revalidatePath("/dashboard/calculator")
+    return { ok: true, id: payload.id }
+  }
+
+  const { data, error } = await supabase
+    .from("materials")
+    .insert(record)
+    .select("id")
+    .single()
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/dashboard/materials")
+  revalidatePath("/dashboard/calculator")
+  return { ok: true, id: data.id as string }
+}
+
+export async function deleteMaterial(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: "You must be logged in." }
+
+  const { error } = await supabase
+    .from("materials")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/dashboard/materials")
+  revalidatePath("/dashboard/calculator")
+  return { ok: true }
+}
+
+// ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------
 export interface CustomerPayload {

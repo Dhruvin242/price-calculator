@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, RotateCcw, Save, Trash2 } from "lucide-react"
+import { Boxes, Loader2, Plus, RotateCcw, Save, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { saveProduct } from "@/lib/actions"
@@ -17,7 +18,13 @@ import {
   type OverheadLine,
   type PricingInputs,
 } from "@/lib/pricing"
-import { PRODUCT_CATEGORIES, type ProductInputs, type ProductRow } from "@/types"
+import {
+  PRODUCT_CATEGORIES,
+  type MaterialRow,
+  type ProductInputs,
+  type ProductRow,
+} from "@/types"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -46,16 +53,24 @@ function fromProduct(product?: ProductRow | null): CalculatorState {
       ...product.inputs,
     }
   }
+  // A new product starts with the sample margins and overheads, but no material
+  // rows — makers add their own from the library instead of clearing ours.
   const sample = sampleInputs()
-  return { name: "", category: PRODUCT_CATEGORIES[0], ...sample }
+  return { name: "", category: PRODUCT_CATEGORIES[0], ...sample, materials: [] }
 }
+
+/** Sentinel for a material row that isn't linked to the library. */
+const CUSTOM_MATERIAL = "__custom"
 
 export function PricingCalculator({
   product,
   currency,
+  library = [],
 }: {
   product?: ProductRow | null
   currency: string
+  /** The maker's saved materials, offered in each row's dropdown. */
+  library?: MaterialRow[]
 }) {
   const router = useRouter()
   const [state, setState] = React.useState<CalculatorState>(() => fromProduct(product))
@@ -90,6 +105,26 @@ export function PricingCalculator({
     setState((prev) => ({ ...prev, materials: [...prev.materials, emptyMaterial()] }))
   const removeMaterial = (id: string) =>
     setState((prev) => ({ ...prev, materials: prev.materials.filter((m) => m.id !== id) }))
+
+  /**
+   * Copies the library material's costing onto the row. The line stays a
+   * snapshot from here on, so later library edits never move a saved price.
+   */
+  const pickMaterial = (id: string, value: string) => {
+    if (value === CUSTOM_MATERIAL) {
+      updateMaterial(id, { materialId: null })
+      return
+    }
+    const item = library.find((m) => m.id === value)
+    if (!item) return
+    updateMaterial(id, {
+      materialId: item.id,
+      name: item.name,
+      unit: item.unit,
+      packageCost: item.package_cost,
+      unitsPerPackage: item.units_per_package,
+    })
+  }
 
   // ----- overhead -----
   const updateOverhead = (id: string, patch: Partial<OverheadLine>) =>
@@ -201,24 +236,33 @@ export function PricingCalculator({
               )}
             />
             <div className="divide-y">
+              {state.materials.length === 0 && (
+                <p className="px-5 py-6 text-center text-sm text-muted-foreground">
+                  No materials yet. Add one below
+                  {library.length > 0 ? " and pick it from your library." : "."}
+                </p>
+              )}
               {/* header row (desktop) */}
-              <div className="hidden grid-cols-[1.6fr_repeat(3,1fr)_auto] gap-3 px-5 py-2 text-xs font-medium text-muted-foreground sm:grid">
-                <span>Material</span>
-                <span className="text-right">Qty / piece</span>
-                <span className="text-right">Pack price</span>
-                <span className="text-right">Units / pack</span>
-                <span className="w-8" />
-              </div>
+              {state.materials.length > 0 && (
+                <div className="hidden grid-cols-[1.6fr_repeat(3,1fr)_auto] gap-3 px-5 py-2 text-xs font-medium text-muted-foreground sm:grid">
+                  <span>Material</span>
+                  <span className="text-right">Qty / piece</span>
+                  <span className="text-right">Pack price</span>
+                  <span className="text-right">Units / pack</span>
+                  <span className="w-8" />
+                </div>
+              )}
               {state.materials.map((material) => (
                 <div
                   key={material.id}
-                  className="grid grid-cols-2 gap-3 px-5 py-3 sm:grid-cols-[1.6fr_repeat(3,1fr)_auto] sm:items-center"
+                  className="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[1.6fr_repeat(3,1fr)_auto] sm:items-center sm:gap-3 sm:px-5"
                 >
-                  <Input
-                    className="col-span-2 sm:col-span-1"
-                    placeholder="Material name"
-                    value={material.name}
-                    onChange={(e) => updateMaterial(material.id, { name: e.target.value })}
+                  <MaterialPicker
+                    material={material}
+                    library={library}
+                    currency={currency}
+                    onPick={(value) => pickMaterial(material.id, value)}
+                    onRename={(name) => updateMaterial(material.id, { name })}
                   />
                   <LabeledField label="Qty">
                     <NumberInput
@@ -227,18 +271,36 @@ export function PricingCalculator({
                       onValueChange={(v) => updateMaterial(material.id, { qtyPerPiece: v })}
                     />
                   </LabeledField>
-                  <LabeledField label="Pack price">
+                  <LabeledField
+                    label="Pack price"
+                    className={isLinked(material, library) ? "hidden sm:flex" : undefined}
+                  >
                     <NumberInput
                       className="text-right"
                       value={material.packageCost}
+                      disabled={isLinked(material, library)}
+                      title={
+                        isLinked(material, library)
+                          ? "Set by the materials library"
+                          : undefined
+                      }
                       onValueChange={(v) => updateMaterial(material.id, { packageCost: v })}
                     />
                   </LabeledField>
-                  <LabeledField label="Units / pack">
+                  <LabeledField
+                    label="Units / pack"
+                    className={isLinked(material, library) ? "hidden sm:flex" : undefined}
+                  >
                     <NumberInput
                       className="text-right"
                       min={1}
                       value={material.unitsPerPackage}
+                      disabled={isLinked(material, library)}
+                      title={
+                        isLinked(material, library)
+                          ? "Set by the materials library"
+                          : undefined
+                      }
                       onValueChange={(v) => updateMaterial(material.id, { unitsPerPackage: v })}
                     />
                   </LabeledField>
@@ -258,10 +320,19 @@ export function PricingCalculator({
                 </div>
               ))}
             </div>
-            <div className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
               <Button variant="outline" size="sm" onClick={addMaterial}>
                 <Plus className="size-4" /> Add material
               </Button>
+              <Link
+                href="/dashboard/materials"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Boxes className="size-3.5" />
+                {library.length > 0
+                  ? "Manage materials library"
+                  : "Save materials once, reuse them here"}
+              </Link>
             </div>
           </Card>
 
@@ -383,6 +454,83 @@ export function PricingCalculator({
   )
 }
 
+/**
+ * True when the line still points at a material that exists in the library —
+ * its costing is then owned by the library and locked in the calculator.
+ * A material deleted from the library falls back to a free-text line.
+ */
+function isLinked(material: MaterialLine, library: MaterialRow[]) {
+  return Boolean(material.materialId) && library.some((m) => m.id === material.materialId)
+}
+
+/**
+ * The material name cell: a dropdown of the maker's saved materials, falling
+ * back to a free-text name for one-off (or library-deleted) lines.
+ */
+function MaterialPicker({
+  material,
+  library,
+  currency,
+  onPick,
+  onRename,
+}: {
+  material: MaterialLine
+  library: MaterialRow[]
+  currency: string
+  onPick: (value: string) => void
+  onRename: (name: string) => void
+}) {
+  const linked = isLinked(material, library) ? material.materialId! : CUSTOM_MATERIAL
+
+  if (library.length === 0) {
+    return (
+      <Input
+        className="col-span-2 sm:col-span-1"
+        placeholder="Material name"
+        value={material.name}
+        onChange={(e) => onRename(e.target.value)}
+      />
+    )
+  }
+
+  return (
+    <div className="col-span-2 flex flex-col gap-2 sm:col-span-1">
+      <Select value={linked} onValueChange={(v) => onPick(v as string)}>
+        <SelectTrigger className="w-full">
+          {/* the value is a material id — render its name instead */}
+          <SelectValue>
+            {(value: string) =>
+              library.find((m) => m.id === value)?.name ?? "Custom material"
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={CUSTOM_MATERIAL}>Custom material</SelectItem>
+          {library.map((item) => (
+            <SelectItem key={item.id} value={item.id}>
+              {item.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {linked === CUSTOM_MATERIAL ? (
+        <Input
+          placeholder="Material name"
+          value={material.name}
+          onChange={(e) => onRename(e.target.value)}
+        />
+      ) : (
+        // the pack fields are hidden on phones for a linked line, so restate
+        // the costing the library is supplying
+        <p className="text-xs text-muted-foreground tabular-nums sm:hidden">
+          {formatCurrency(material.packageCost, currency)} / {material.unitsPerPackage}{" "}
+          {material.unit ?? "units"}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function SectionHeader({
   title,
   subtitle,
@@ -393,7 +541,7 @@ function SectionHeader({
   total: string
 }) {
   return (
-    <div className="flex items-center justify-between border-b p-5">
+    <div className="flex items-center justify-between gap-3 border-b p-4 sm:p-5">
       <div>
         <h3 className="font-heading text-base font-semibold">{title}</h3>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
@@ -403,9 +551,17 @@ function SectionHeader({
   )
 }
 
-function LabeledField({ label, children }: { label: string; children: React.ReactNode }) {
+function LabeledField({
+  label,
+  className,
+  children,
+}: {
+  label: string
+  className?: string
+  children: React.ReactNode
+}) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={cn("flex flex-col gap-1", className)}>
       <span className="text-xs text-muted-foreground sm:hidden">{label}</span>
       {children}
     </div>

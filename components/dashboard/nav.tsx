@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  Boxes,
   Calculator,
   FileText,
   LayoutDashboard,
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/calculator", label: "Calculator", icon: Calculator },
   { href: "/dashboard/products", label: "Products", icon: Package },
+  { href: "/dashboard/materials", label: "Materials", icon: Boxes },
   { href: "/dashboard/stalls", label: "Live Stall", icon: Store },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },

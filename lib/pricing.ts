@@ -22,6 +22,14 @@ export type PriceBasis = "auto" | "keystone" | "custom"
 export interface MaterialLine {
   id: string
   name: string
+  /**
+   * Optional link to a row in the maker's `materials` library. The costing
+   * below stays a snapshot: editing the library later never rewrites a saved
+   * product's price.
+   */
+  materialId?: string | null
+  /** Unit the quantity is counted in ("piece", "gram", …). Display only. */
+  unit?: string | null
   /** Quantity of this material consumed per finished piece. */
   qtyPerPiece: number
   /** Cost of one purchased package/unit of the material. */

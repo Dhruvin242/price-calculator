@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/server"
 import type {
   CustomerRow,
+  MaterialRow,
   InvoiceListItem,
   InvoiceWithItems,
   ProductRow,
@@ -103,6 +104,20 @@ export async function getStall(id: string): Promise<StallWithSales | null> {
     b.created_at.localeCompare(a.created_at)
   )
   return stall
+}
+
+// ---------------------------------------------------------------------------
+// Materials library
+// ---------------------------------------------------------------------------
+export async function getMaterials(): Promise<MaterialRow[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("materials")
+    .select("*")
+    .order("name", { ascending: true })
+
+  if (error) throw error
+  return (data as MaterialRow[]) ?? []
 }
 
 // ---------------------------------------------------------------------------
