@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -65,19 +66,24 @@ export function UserMenu({
         }
       />
       <DropdownMenuContent align={align} className="w-56">
-        <DropdownMenuLabel>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-foreground">{name || "Your account"}</span>
-            <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
-          <User className="size-4" /> Profile
-        </DropdownMenuItem>
-        <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
-          <Settings className="size-4" /> Settings
-        </DropdownMenuItem>
+        {/* the label is a Base UI group part — it throws outside a Group */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">
+                {name || "Your account"}
+              </span>
+              <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
+            <User className="size-4" /> Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
+            <Settings className="size-4" /> Settings
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <form action={signOut}>
           <DropdownMenuItem
