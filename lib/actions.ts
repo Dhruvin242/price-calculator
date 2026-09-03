@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/server"
-import { calculatePricing } from "@/lib/pricing"
+import { calculatePricing, type MaterialLine } from "@/lib/pricing"
 import {
   canTransition,
   computeInvoice,
@@ -252,7 +252,69 @@ export interface MaterialPayload {
   notes: string | null
 }
 
-export async function saveMaterial(payload: MaterialPayload): Promise<ActionResult> {
+export interface MaterialSaveResult extends ActionResult {
+  /** How many saved products were repriced by this edit. */
+  repricedProducts?: number
+}
+
+/**
+ * Pushes a material's new costing into every saved product that uses it and
+ * recomputes the stored pricing summary, so a supplier price change moves the
+ * recommended price of the products built from it.
+ *
+ * A maker's catalogue is small, so this scans their products rather than
+ * reaching for a jsonb containment query.
+ */
+async function repriceProductsUsing(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  material: { id: string; name: string; unit: string; package_cost: number; units_per_package: number }
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, inputs")
+    .eq("user_id", userId)
+  if (error || !data) return 0
+
+  const affected = (data as { id: string; inputs: ProductInputs }[]).filter((product) =>
+    (product.inputs?.materials ?? []).some((line) => line.materialId === material.id)
+  )
+
+  let updated = 0
+  for (const product of affected) {
+    const materials: MaterialLine[] = product.inputs.materials.map((line) =>
+      line.materialId === material.id
+        ? {
+            ...line,
+            name: material.name,
+            unit: material.unit,
+            packageCost: material.package_cost,
+            unitsPerPackage: material.units_per_package,
+          }
+        : line
+    )
+    const inputs: ProductInputs = { ...product.inputs, materials }
+    const result = calculatePricing(inputs)
+
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({
+        inputs,
+        base_cost: round(result.baseCost),
+        recommended_price: round(result.finalSellingPrice),
+        net_profit: round(result.netProfit),
+        net_margin: round(result.netProfitMargin, 4),
+        health: result.health,
+      })
+      .eq("id", product.id)
+      .eq("user_id", userId)
+    if (!updateError) updated += 1
+  }
+
+  return updated
+}
+
+export async function saveMaterial(payload: MaterialPayload): Promise<MaterialSaveResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -282,9 +344,17 @@ export async function saveMaterial(payload: MaterialPayload): Promise<ActionResu
       .eq("id", payload.id)
       .eq("user_id", user.id)
     if (error) return { ok: false, error: error.message }
+
+    const repricedProducts = await repriceProductsUsing(supabase, user.id, {
+      id: payload.id,
+      ...record,
+    })
+
+    revalidatePath("/dashboard")
+    revalidatePath("/dashboard/products")
     revalidatePath("/dashboard/materials")
     revalidatePath("/dashboard/calculator")
-    return { ok: true, id: payload.id }
+    return { ok: true, id: payload.id, repricedProducts }
   }
 
   const { data, error } = await supabase

@@ -90,7 +90,15 @@ export function MaterialFormDialog({
         toast.error(res.error ?? "Could not save material")
         return
       }
-      toast.success(material ? "Material updated" : "Material added")
+      const repriced = res.repricedProducts ?? 0
+      toast.success(material ? "Material updated" : "Material added", {
+        description:
+          repriced > 0
+            ? `${repriced} product${repriced === 1 ? "" : "s"} using it ${
+                repriced === 1 ? "was" : "were"
+              } repriced.`
+            : undefined,
+      })
       setOpen(false)
       if (res.id) onSaved?.(res.id)
       router.refresh()
@@ -110,8 +118,8 @@ export function MaterialFormDialog({
         <DialogHeader>
           <DialogTitle>{material ? "Edit material" : "New material"}</DialogTitle>
           <DialogDescription>
-            Enter what a pack costs and how many units it holds. The calculator picks
-            this up so you never retype a price.
+            Enter what a pack costs and how many units it holds. Editing a price here
+            reprices every saved product that uses this material.
           </DialogDescription>
         </DialogHeader>
 

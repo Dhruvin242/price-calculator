@@ -136,8 +136,8 @@ export function MaterialsGrid({
           <DialogHeader>
             <DialogTitle>Delete this material?</DialogTitle>
             <DialogDescription>
-              “{target?.name}” will be removed from your library. Saved products keep the
-              costs they were priced with and are not affected.
+              “{target?.name}” will be removed from your library. Products priced with
+              it keep their current costs, but they will no longer follow price changes.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
