@@ -276,8 +276,12 @@ async function repriceProductsUsing(
     .eq("user_id", userId)
   if (error || !data) return 0
 
-  const affected = (data as { id: string; inputs: ProductInputs }[]).filter((product) =>
-    (product.inputs?.materials ?? []).some((line) => line.materialId === material.id)
+  const affected = (data as { id: string; inputs: ProductInputs }[]).filter(
+    (product) =>
+      // a resale product is priced from its purchase cost, so its materials
+      // list (kept in case the maker switches back) must not move its price
+      (product.inputs?.sourcing ?? "make") !== "resell" &&
+      (product.inputs?.materials ?? []).some((line) => line.materialId === material.id)
   )
 
   let updated = 0

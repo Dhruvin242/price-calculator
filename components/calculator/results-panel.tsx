@@ -205,7 +205,10 @@ export function ResultsPanel({
       <div className="rounded-3xl border bg-card p-5">
         <p className="text-sm font-semibold">Cost breakdown</p>
         <div className="mt-2">
-          <Row label="Materials" value={formatCurrency(result.totalMaterialCost, currency)} />
+          <Row
+            label={result.sourcing === "resell" ? "Bought-in cost" : "Materials"}
+            value={formatCurrency(result.totalMaterialCost, currency)}
+          />
           <Row label="Labor" value={formatCurrency(result.laborCost, currency)} />
           <Row label="Overhead" value={formatCurrency(result.totalOverhead, currency)} />
           <Row label="Base cost" value={formatCurrency(result.baseCost, currency)} strong />

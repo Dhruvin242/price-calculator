@@ -3,6 +3,7 @@
  *
  * Mirrors the spreadsheet model used by handmade-product makers:
  *   Material Cost  = Qty Used × Unit/Package Cost ÷ Units per Package
+ *   Resale goods   = Purchase Price ÷ Units Bought  (replaces Material Cost)
  *   Labor Cost     = Hourly Wage × Production Hours
  *   Base Cost      = Materials + Labor + Fixed Overhead
  *   Wholesale      = Base Cost × (1 + Wholesale Margin)
@@ -18,6 +19,13 @@ export type HealthStatus = "LOW" | "WATCH" | "HEALTHY"
 
 /** Which retail price the recommendation is based on. */
 export type PriceBasis = "auto" | "keystone" | "custom"
+
+/**
+ * Where the goods come from. "make" builds the cost up from a materials list;
+ * "resell" takes in a finished item bought from someone else and sells it on
+ * at the maker's own margin.
+ */
+export type Sourcing = "make" | "resell"
 
 export interface MaterialLine {
   id: string
@@ -45,6 +53,14 @@ export interface OverheadLine {
 }
 
 export interface PricingInputs {
+  /** Defaults to "make". */
+  sourcing?: Sourcing
+  /** What the whole resale buy cost, when sourcing is "resell". */
+  purchaseCost?: number
+  /** How many sellable units that buy covers. */
+  purchaseUnits?: number
+  /** Who the finished item was bought from. Display only. */
+  purchaseSource?: string | null
   wholesaleMargin: number
   customRetailMargin: number
   platformFeePct: number
@@ -57,6 +73,8 @@ export interface PricingInputs {
 }
 
 export interface PricingResult {
+  sourcing: Sourcing
+  /** Cost of goods for one unit: the materials total, or the resale unit cost. */
   totalMaterialCost: number
   laborCost: number
   totalOverhead: number
@@ -82,11 +100,22 @@ export function materialLineCost(line: MaterialLine): number {
   return safe((line.qtyPerPiece * line.packageCost) / line.unitsPerPackage)
 }
 
+/** Per-unit cost of a bought-in finished product. */
+export function purchaseUnitCost(inputs: PricingInputs): number {
+  const units = inputs.purchaseUnits ?? 1
+  if (!units) return 0
+  return safe((inputs.purchaseCost ?? 0) / units)
+}
+
 export function calculatePricing(inputs: PricingInputs): PricingResult {
-  const totalMaterialCost = inputs.materials.reduce(
-    (sum, line) => sum + materialLineCost(line),
-    0
-  )
+  const sourcing = inputs.sourcing ?? "make"
+
+  // the two sourcing modes are exclusive: a resale line never also carries a
+  // materials list, so stale rows from a switched mode can't inflate the cost
+  const totalMaterialCost =
+    sourcing === "resell"
+      ? purchaseUnitCost(inputs)
+      : inputs.materials.reduce((sum, line) => sum + materialLineCost(line), 0)
 
   const laborCost = safe(inputs.hourlyWage * inputs.productionHours)
   const totalOverhead = inputs.overheads.reduce(
@@ -116,6 +145,7 @@ export function calculatePricing(inputs: PricingInputs): PricingResult {
   const markupOnBase = baseCost ? (finalSellingPrice - baseCost) / baseCost : 0
 
   return {
+    sourcing,
     totalMaterialCost,
     laborCost,
     totalOverhead,

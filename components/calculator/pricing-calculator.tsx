@@ -3,7 +3,17 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Boxes, Loader2, Plus, RotateCcw, Save, Trash2 } from "lucide-react"
+import {
+  Boxes,
+  Hammer,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Save,
+  ShoppingBag,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { saveProduct } from "@/lib/actions"
@@ -13,10 +23,12 @@ import {
   emptyOverhead,
   formatCurrency,
   materialLineCost,
+  purchaseUnitCost,
   sampleInputs,
   type MaterialLine,
   type OverheadLine,
   type PricingInputs,
+  type Sourcing,
 } from "@/lib/pricing"
 import {
   PRODUCT_CATEGORIES,
@@ -56,7 +68,16 @@ function fromProduct(product?: ProductRow | null): CalculatorState {
   // A new product starts with the sample margins and overheads, but no material
   // rows — makers add their own from the library instead of clearing ours.
   const sample = sampleInputs()
-  return { name: "", category: PRODUCT_CATEGORIES[0], ...sample, materials: [] }
+  return {
+    name: "",
+    category: PRODUCT_CATEGORIES[0],
+    ...sample,
+    materials: [],
+    sourcing: "make",
+    purchaseCost: 0,
+    purchaseUnits: 1,
+    purchaseSource: "",
+  }
 }
 
 /** Sentinel for a material row that isn't linked to the library. */
@@ -76,8 +97,15 @@ export function PricingCalculator({
   const [state, setState] = React.useState<CalculatorState>(() => fromProduct(product))
   const [saving, startSaving] = React.useTransition()
 
+  const sourcing: Sourcing = state.sourcing ?? "make"
+  const isResale = sourcing === "resell"
+
   const inputs: PricingInputs = React.useMemo(
     () => ({
+      sourcing: state.sourcing ?? "make",
+      purchaseCost: state.purchaseCost ?? 0,
+      purchaseUnits: state.purchaseUnits ?? 1,
+      purchaseSource: state.purchaseSource ?? null,
       wholesaleMargin: state.wholesaleMargin,
       customRetailMargin: state.customRetailMargin,
       platformFeePct: state.platformFeePct,
@@ -148,6 +176,10 @@ export function PricingCalculator({
         name: state.name,
         category: state.category,
         inputs: {
+          sourcing,
+          purchaseCost: state.purchaseCost ?? 0,
+          purchaseUnits: state.purchaseUnits ?? 1,
+          purchaseSource: state.purchaseSource?.trim() || null,
           wholesaleMargin: state.wholesaleMargin,
           customRetailMargin: state.customRetailMargin,
           platformFeePct: state.platformFeePct,
@@ -223,9 +255,63 @@ export function PricingCalculator({
                 </Select>
               </div>
             </div>
+
+            <div className="mt-4 flex flex-col gap-1.5">
+              <Label>Where it comes from</Label>
+              <SourcingToggle value={sourcing} onChange={(v) => set("sourcing", v)} />
+              <p className="text-xs text-muted-foreground">
+                {isResale
+                  ? "Priced from what you paid a supplier, plus your own margin."
+                  : "Priced from your materials, labor and overhead."}
+              </p>
+            </div>
           </Card>
 
+          {/* bought-in cost (resale) */}
+          {isResale && (
+            <Card className="gap-0 p-0">
+              <SectionHeader
+                title="Bought-in cost"
+                subtitle="What one finished piece costs you"
+                total={formatCurrency(purchaseUnitCost(inputs), currency)}
+              />
+              <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
+                <div className="flex flex-col gap-1.5">
+                  <Label>What you paid</Label>
+                  <NumberInput
+                    className="text-right"
+                    value={state.purchaseCost ?? 0}
+                    onValueChange={(v) => set("purchaseCost", v)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Pieces that covers</Label>
+                  <NumberInput
+                    className="text-right"
+                    min={0}
+                    value={state.purchaseUnits ?? 1}
+                    onValueChange={(v) => set("purchaseUnits", v)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label htmlFor="purchase-source">Bought from</Label>
+                  <Input
+                    id="purchase-source"
+                    placeholder="Supplier, wholesaler or the maker"
+                    value={state.purchaseSource ?? ""}
+                    onChange={(e) => set("purchaseSource", e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="border-t px-4 py-3 text-xs text-muted-foreground sm:px-5">
+                Bought a lot? Enter the lot price and how many sellable pieces it covers.
+                Freight, repacking and commission belong in Overhead below.
+              </p>
+            </Card>
+          )}
+
           {/* materials */}
+          {!isResale && (
           <Card className="gap-0 p-0">
             <SectionHeader
               title="Direct materials"
@@ -335,13 +421,20 @@ export function PricingCalculator({
               </Link>
             </div>
           </Card>
+          )}
 
           {/* labor */}
           <Card className="gap-0 p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-heading text-base font-semibold">Labor &amp; time</h3>
-                <p className="text-sm text-muted-foreground">Your rate times the hours per piece.</p>
+                <h3 className="font-heading text-base font-semibold">
+                  {isResale ? "Handling time" : "Labor & time"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {isResale
+                    ? "Your rate times the time spent listing and packing a piece."
+                    : "Your rate times the hours per piece."}
+                </p>
               </div>
               <span className="text-sm font-semibold tabular-nums">
                 {formatCurrency(state.hourlyWage * state.productionHours, currency)}
@@ -356,7 +449,7 @@ export function PricingCalculator({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label>Production hours / piece</Label>
+                <Label>{isResale ? "Handling hours / piece" : "Production hours / piece"}</Label>
                 <NumberInput
                   value={state.productionHours}
                   onValueChange={(v) => set("productionHours", v)}
@@ -451,6 +544,42 @@ export function PricingCalculator({
         </div>
       </div>
     </>
+  )
+}
+
+/** Segmented control for how the product is sourced. */
+function SourcingToggle({
+  value,
+  onChange,
+}: {
+  value: Sourcing
+  onChange: (value: Sourcing) => void
+}) {
+  const options: { value: Sourcing; label: string; icon: LucideIcon }[] = [
+    { value: "make", label: "I make it", icon: Hammer },
+    { value: "resell", label: "I buy & resell", icon: ShoppingBag },
+  ]
+
+  return (
+    <div className="inline-flex w-full rounded-full border bg-background/50 p-0.5">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          className={cn(
+            "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+            value === option.value
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <option.icon className="size-4" />
+          {option.label}
+        </button>
+      ))}
+    </div>
   )
 }
 

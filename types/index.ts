@@ -1,4 +1,10 @@
-import type { MaterialLine, OverheadLine, HealthStatus, PriceBasis } from "@/lib/pricing"
+import type {
+  MaterialLine,
+  OverheadLine,
+  HealthStatus,
+  PriceBasis,
+  Sourcing,
+} from "@/lib/pricing"
 import type { DiscountType, InvoiceStatus } from "@/lib/invoice"
 
 export interface ProfileRow {
@@ -13,6 +19,11 @@ export interface ProfileRow {
 
 /** Shape of the JSON persisted in `products.inputs`. */
 export interface ProductInputs {
+  /** Absent on rows saved before resale products existed — treat as "make". */
+  sourcing?: Sourcing
+  purchaseCost?: number
+  purchaseUnits?: number
+  purchaseSource?: string | null
   wholesaleMargin: number
   customRetailMargin: number
   platformFeePct: number

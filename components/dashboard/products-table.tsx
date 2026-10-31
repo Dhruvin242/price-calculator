@@ -155,6 +155,19 @@ function usePricingRow(product: ProductRow) {
   }, [product])
 }
 
+/** Bought-in products are priced from a supplier cost, not a materials list. */
+function isResale(product: ProductRow) {
+  return product.inputs?.sourcing === "resell"
+}
+
+function ResaleTag() {
+  return (
+    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+      Resale
+    </span>
+  )
+}
+
 function ProductCard({
   product,
   currency,
@@ -177,8 +190,9 @@ function ProductCard({
           href={`/dashboard/calculator?id=${product.id}`}
           className="-m-1 min-w-0 flex-1 rounded-2xl p-1"
         >
-          <p className="flex items-center gap-1 truncate font-medium">
-            {product.name}
+          <p className="flex items-center gap-1.5 truncate font-medium">
+            <span className="truncate">{product.name}</span>
+            {isResale(product) && <ResaleTag />}
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
           </p>
           <p className="truncate text-xs text-muted-foreground">
@@ -231,7 +245,10 @@ function ProductTableRow({
     <tr className="border-b last:border-0 hover:bg-muted/30">
       <td className="px-5 py-3.5">
         <Link href={`/dashboard/calculator?id=${product.id}`} className="block">
-          <p className="font-medium hover:underline">{product.name}</p>
+          <p className="flex items-center gap-1.5 font-medium">
+            <span className="hover:underline">{product.name}</span>
+            {isResale(product) && <ResaleTag />}
+          </p>
           <p className="text-xs text-muted-foreground">{product.category ?? "Uncategorized"}</p>
         </Link>
       </td>

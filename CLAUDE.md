@@ -31,7 +31,7 @@ Copy `.env.example` to `.env.local`. Required:
 ## Architecture
 
 ### Pricing engine — `lib/pricing.ts`
-Pure, dependency-free functions that mirror the maker's spreadsheet model. This is the heart of the app; the header comment documents every formula. `calculatePricing(inputs)` is the single source of truth for base cost → recommended price → net profit → health rating (`LOW` <15% margin, `WATCH` 15–25%, `HEALTHY` ≥25%). Server actions call it before persisting so stored summary columns always match the model. Keep this file pure — no React, no Supabase. `lib/stall.ts` holds the separate stall P&L math (`computeStallPnl`).
+Pure, dependency-free functions that mirror the maker's spreadsheet model. This is the heart of the app; the header comment documents every formula. `calculatePricing(inputs)` is the single source of truth for base cost → recommended price → net profit → health rating (`LOW` <15% margin, `WATCH` 15–25%, `HEALTHY` ≥25%). `inputs.sourcing` picks where cost of goods comes from: `"make"` sums the materials list, `"resell"` uses `purchaseCost ÷ purchaseUnits` for a finished item bought in from someone else. The two are exclusive, so a mode switch can't double-count. Server actions call it before persisting so stored summary columns always match the model. Keep this file pure — no React, no Supabase. `lib/stall.ts` holds the separate stall P&L math (`computeStallPnl`).
 
 ### Supabase clients — three creators, never share instances
 - `lib/client.ts` — browser (`createBrowserClient`), for Client Components.
@@ -49,7 +49,7 @@ Root middleware lives in **`proxy.ts`** (Next.js 16 renamed the convention from 
 Central DB-row and payload types. `ProductInputs` is the JSON shape stored in `products.inputs`; the pricing engine's `MaterialLine`/`OverheadLine`/`HealthStatus` types are re-exported through it. Keep row types in sync with the SQL migrations.
 
 ### Database — `supabase/migrations/`
-Plain SQL, applied in order (`0001_init.sql`, `0002_stalls.sql`) via the Supabase SQL editor or CLI. Tables: `profiles`, `products`, `stalls`, `stall_sales`. **Every table has RLS enabled with owner-only policies** — any new table needs the same. `stall_sales` snapshots product name/price/cost so historical P&L stays stable when a product is later edited or deleted (`product_id` is nullable, `on delete set null`).
+Plain SQL, applied in order (`0001_init.sql` … `0004_materials.sql`) via the Supabase SQL editor or CLI. Tables: `profiles`, `products`, `stalls`, `stall_sales`, `customers`, `invoices`, `invoice_items`, `invoice_counters`, `materials`. **Every table has RLS enabled with owner-only policies** — any new table needs the same. `stall_sales` snapshots product name/price/cost so historical P&L stays stable when a product is later edited or deleted (`product_id` is nullable, `on delete set null`). `materials` is the opposite: product lines link to it by `materialId` inside `products.inputs`, and `saveMaterial` reprices every product using that material so a supplier price change propagates.
 
 ### Route groups
 - `app/(auth)/*` — login, signup, forgot/reset password (own layout).
