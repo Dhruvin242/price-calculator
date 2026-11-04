@@ -65,14 +65,17 @@ function fromProduct(product?: ProductRow | null): CalculatorState {
       ...product.inputs,
     }
   }
-  // A new product starts with the sample margins and overheads, but no material
-  // rows — makers add their own from the library instead of clearing ours.
+  // A new product starts with the sample margins, but nothing costed for the
+  // maker: no material rows, one empty packaging line, and no platform fee
+  // until they say they sell somewhere that charges one.
   const sample = sampleInputs()
   return {
     name: "",
     category: PRODUCT_CATEGORIES[0],
     ...sample,
     materials: [],
+    overheads: [emptyOverhead("Custom packaging")],
+    platformFeePct: 0,
     sourcing: "make",
     purchaseCost: 0,
     purchaseUnits: 1,
